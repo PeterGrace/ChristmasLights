@@ -13,8 +13,11 @@ CRGB leds[NUM_LEDS];
 
 
 //mode settings
-int mode_setting=1;
+int mode_setting=0;
 
+// voob settings
+int voob_bpm=20;
+int voob_color=0;
 
 // icicle settings
 int icicle_pos=0;
@@ -38,35 +41,41 @@ void setup() {
 
 void random_colors()
 {
-    EVERY_N_MILLISECONDS(min_millis)
-  {
-    fadeToBlackBy( leds, NUM_LEDS, FADE_VALUE);     
-  }
     EVERY_N_MILLISECONDS(1250)
-  {
-    int rando = random(0,4);
-    Serial.print("Setting random to: ");
-    Serial.println(rando);
-    switch (rando)
+    {
+      if (leds[0].getLuma() < 1)
+      {
+        voob_color = random(0,4);
+      }
+    }
+}
+
+void voob_mode()
+{
+    uint8_t bright = beatsin8(voob_bpm,0,255);
+    switch (voob_color)
     {
       case 0: {
-                fill_solid(leds, NUM_LEDS, CRGB::Red);
+                //red hue
+                fill_solid(leds, NUM_LEDS, CHSV(0,255,bright));
                 break;
               }
       case 1: {
-                fill_solid(leds, NUM_LEDS, CRGB::Green);
+                //green hue
+                fill_solid(leds, NUM_LEDS, CHSV(96,255,bright));
                 break;
               }
       case 2: {
-                fill_solid(leds, NUM_LEDS, CRGB::Blue);
+                //blue hue
+                fill_solid(leds, NUM_LEDS, CHSV(160,255,bright));
                 break;
               }
       case 3: {
-                fill_solid(leds, NUM_LEDS, CRGB::Orange);
+                //orange hue
+                fill_solid(leds, NUM_LEDS, CHSV(32,255,bright));
                 break;
               }
       }
-    }
 
 }
 
@@ -106,6 +115,12 @@ void icicle_mode()
   }
 }
 
+void red_voob()
+{
+  uint8_t bright = beatsin8(50,0,255);
+  fill_solid(leds, NUM_LEDS, CHSV(0,255,bright));
+}
+
 
 
 void loop() {
@@ -113,11 +128,19 @@ void loop() {
   switch (mode_setting)
   {
     case 0: {
+                // choose red, green, blue or orange to voob
                 random_colors();
+                voob_mode();
                 break;
              }
     case 1: {
                 icicle_mode();
+                break;
+             }
+    case 2: {
+                //red voob only
+                voob_color=0;
+                voob_mode();
                 break;
              }
 
