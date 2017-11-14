@@ -1,10 +1,6 @@
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266SSDP.h>
-#include <ESP8266mDNS.h>
-#include <FastLED.h>
 #include <WiFiUDP.h>
-#include <ESP.h>
 #include "auth.h"
 
 #define BOARD TM1803
