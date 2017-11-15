@@ -1,3 +1,5 @@
+#include <ArduinoJson.h>
+
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
@@ -13,6 +15,8 @@
 #define FRAMES_PER_SEC 60
 
 CRGB leds[NUM_LEDS];
+
+DynamicJsonBuffer jsonBuffer;
 
 //mode settings
 int mode_setting=0;
@@ -183,14 +187,13 @@ void process_packet()
 {
   Serial.print("Received packet: ");
   Serial.println(incomingPacket);
-  int newmode = atoi(incomingPacket);
-  if ((newmode >0) && (newmode <=1024))
-  {
-    Serial.print("Changing mode to: ");
-    Serial.println(newmode);
-    mode_setting=newmode;
-  }
+  JsonObject& input = jsonBuffer.parseObject(incomingPacket);
+  if (input["mode"])
+    mode_setting=input["mode"];
+  if (input["bpm"])
+    voob_bpm=input["bpm"];  
 }
+  
 
 void black()
 {
