@@ -1,5 +1,5 @@
 #include <ArduinoJson.h>
-
+//#include <Timer.h>
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
@@ -14,15 +14,20 @@
 
 #define FRAMES_PER_SEC 60
 
+//Timer t;
+
 CRGB leds[NUM_LEDS];
+CRGB endclr, midclr;
 
 DynamicJsonBuffer jsonBuffer;
+char msg[255];
 
 //mode settings
 int mode_setting=0;
+int bpm=20;
+long bpm_millis=60000/bpm;
 
 // voob settings
-int voob_bpm=20;
 int voob_color=0;
 
 // icicle settings
@@ -30,7 +35,15 @@ int icicle_pos=0;
 bool icicle_animate=false;
 bool icicle_pauser=false;
 
+//pattern mode
+int pattern_time = 3000;
 static int min_millis=1000/FRAMES_PER_SEC;
+
+
+//swipe mode
+int swipe_sin1 = 0;
+int swipe_sin2 = 0;
+
 
 unsigned int udp_port = 1225;
 char incomingPacket[255];
@@ -39,7 +52,6 @@ WiFiUDP udp;
 
 void initialize_wifi()
 {
-  char msg[255];
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   sprintf(msg, "Trying to connect to ssid %s with password %s.\n", ssid, password);
@@ -69,7 +81,7 @@ void setup() {
  Serial.print("\n\nInitialized.  Frame rate dictates minimum refresh rate of: ");
  Serial.println(min_millis);
  randomSeed(analogRead(0));
- 
+ set_bpm(20);
 }
 
 void random_colors()
@@ -114,7 +126,7 @@ void solid_mode()
 
 void voob_mode()
 {
-    uint8_t bright = beatsin8(voob_bpm,0,255);
+    uint8_t bright = beatsin8(bpm,0,255);
     switch (voob_color)
     {
       case 0: {
@@ -179,7 +191,7 @@ void icicle_mode()
 
 void red_voob()
 {
-  uint8_t bright = beatsin8(50,0,255);
+  uint8_t bright = beatsin8(bpm,0,255);
   fill_solid(leds, NUM_LEDS, CHSV(0,255,bright));
 }
 
@@ -191,7 +203,8 @@ void process_packet()
   if (input["mode"])
     mode_setting=input["mode"];
   if (input["bpm"])
-    voob_bpm=input["bpm"];  
+    set_bpm(atoi(input["bpm"]));
+    
 }
   
 
@@ -260,6 +273,22 @@ void modeSelection()
                 solid_mode();
                 break;         
              }
+    case 50: {
+               swipe_redgreen();        
+               break;
+              }
+    case 51: {
+               swipe_redblue();        
+               break;
+              }
+    case 52: {
+               swipe_bluegreen();        
+               break;
+              }
+    case 99: { 
+               gradient_mode();
+               break;
+            }
              
              
              
@@ -269,6 +298,41 @@ void modeSelection()
                 break;
              }
     }
+}
+
+void swipe_redgreen()
+{
+    swipe_sin1=beatsin8(bpm, 0, NUM_LEDS,0,0);
+    //swipe_sin2=beatsin8(bpm, 0, NUM_LEDS,0,90);
+    fill_gradient_RGB(leds, 0, CRGB::Green, swipe_sin1, CRGB::Red);
+    fill_gradient_RGB(leds, swipe_sin1, CRGB::Red, NUM_LEDS, CRGB::Green);
+}
+
+void swipe_redblue()
+{
+    swipe_sin1=beatsin8(bpm, 0, NUM_LEDS,0,0);
+    //swipe_sin2=beatsin8(bpm, 0, NUM_LEDS,0,90);
+    fill_gradient_RGB(leds, 0, CRGB::Blue, swipe_sin1, CRGB::Red);
+    fill_gradient_RGB(leds, swipe_sin1, CRGB::Red, NUM_LEDS, CRGB::Blue);
+}
+
+void swipe_bluegreen()
+{
+    swipe_sin1=beatsin8(bpm, 0, NUM_LEDS,0,0);
+    //swipe_sin2=beatsin8(bpm, 0, NUM_LEDS,0,90);
+    fill_gradient_RGB(leds, 0, CRGB::Blue, swipe_sin1, CRGB::Green);
+    fill_gradient_RGB(leds, swipe_sin1, CRGB::Green, NUM_LEDS, CRGB::Blue);
+}
+
+
+void gradient_mode()
+{
+  
+  uint8_t speed = beatsin8(bpm,0,255);
+  endclr = blend(CRGB::Red, CRGB::Green, speed);
+  midclr = blend(CRGB::Green, CRGB::Blue, speed);
+  fill_gradient_RGB(leds, 0, endclr, NUM_LEDS/2, midclr);
+  fill_gradient_RGB(leds, NUM_LEDS/2+1, midclr, NUM_LEDS, endclr);  
 }
 
 void udpCheck()
@@ -290,6 +354,14 @@ void loop() {
   FastLED.delay(min_millis);
   udpCheck();
   modeSelection();
+//  t.update();
 }
 
+void set_bpm(int _bpm)
+{
+  bpm = _bpm;
+  bpm_millis = 60000/bpm;
+  sprintf(msg,"BPM set to: %d (millis: %d)", bpm, bpm_millis);
+  Serial.println(msg);
+}
 
