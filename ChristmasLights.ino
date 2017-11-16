@@ -2,12 +2,15 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <ArduinoJson.h>
-#include "elapsedMillis.h"
+#include <NTPClient.h>
+#include <elapsedMillis.h>
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
+#include <QList.h>
+#include <QList.cpp>
+
 #include "auth.h"
-#include "QList.h"
-#include "QList.cpp"
+
 
 #define BOARD TM1803
 #define PIN 5
