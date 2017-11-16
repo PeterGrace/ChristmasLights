@@ -1,9 +1,11 @@
 #include <ArduinoJson.h>
-//#include <Timer.h>
+#include "elapsedMillis.h"
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
 #include "auth.h"
+#include "QList.h"
+#include "QList.cpp"
 
 #define BOARD TM1803
 #define PIN 5
@@ -14,13 +16,22 @@
 
 #define FRAMES_PER_SEC 60
 
-//Timer t;
+elapsedMillis em_status_screen=0;
+elapsedMillis em_icicle_velocity=0;
+elapsedMillis em_icicle_new=0;
+
+int status_screen_interval=5000;
+
+QList<String> msg_queue;
 
 CRGB leds[NUM_LEDS];
 CRGB endclr, midclr;
 
 DynamicJsonBuffer jsonBuffer;
 char msg[255];
+static int min_millis=1000/FRAMES_PER_SEC;
+
+int newtime=0;
 
 //mode settings
 int mode_setting=0;
@@ -32,12 +43,16 @@ int voob_color=0;
 
 // icicle settings
 int icicle_pos=0;
+int icicle_velocity_interval=0;
+int icicle_new_interval=0;
 bool icicle_animate=false;
-bool icicle_pauser=false;
+int icicle_new_min=2000;
+int icicle_new_max=5000;
+int icicle_wait_min=min_millis;
+int icicle_wait_max=1000;
 
 //pattern mode
 int pattern_time = 3000;
-static int min_millis=1000/FRAMES_PER_SEC;
 
 
 //swipe mode
@@ -55,19 +70,34 @@ void initialize_wifi()
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   sprintf(msg, "Trying to connect to ssid %s with password %s.\n", ssid, password);
-  Serial.print(msg);
+  msg_queue.push_front(msg);
   while (WiFi.localIP().toString() == "0.0.0.0")
   {
     delay(500);
-    Serial.println(WiFi.localIP().toString());
+    msg_queue.push_front(WiFi.localIP().toString());
   }
-  Serial.print("Connected to wifi with ip");
-  Serial.println(WiFi.localIP());
+  String mymsg="Connected to wifi with ip " + WiFi.localIP().toString();
+  msg_queue.push_front(mymsg);
   delay(1000);
   WiFi.setAutoReconnect(true);
   udp.begin(udp_port);
 }
 
+void doStatusScreen()
+{
+  Serial.write(27);       // ESC command
+  Serial.print("[2J");    // clear screen command
+  Serial.write(27);
+  Serial.print("[H");     // cursor to home command
+
+  Serial.println("Messages:");
+  while (msg_queue.size() > 0)
+  {
+    String msg = msg_queue.front();
+    Serial.println(msg);
+    msg_queue.pop_front();
+  }
+}
 
 
 void setup() {
@@ -78,8 +108,7 @@ void setup() {
  fill_solid(leds, NUM_LEDS, CRGB::Blue);
  FastLED.show();
  initialize_wifi();
- Serial.print("\n\nInitialized.  Frame rate dictates minimum refresh rate of: ");
- Serial.println(min_millis);
+ sprintf(msg, "Initialized.  Frame rate dictates minimum refresh rate of: %d", min_millis);
  randomSeed(analogRead(0));
  set_bpm(20);
 }
@@ -153,27 +182,8 @@ void voob_mode()
 
 }
 
-void icicle_mode()
+void doIcicle()
 {
-  EVERY_N_MILLISECONDS(random(2000,5000))
-  {
-    icicle_animate=true;
-  }
-
-  EVERY_N_MILLISECONDS(random(min_millis, 300))
-  {
-    if (icicle_pauser==false)
-    {
-      icicle_animate=false;
-      icicle_pauser=true;
-    }
-    else
-    {
-      icicle_animate=true;
-      icicle_pauser=false;
-    }
-  }
-  
   if (icicle_animate)
   {
     fadeToBlackBy( leds, NUM_LEDS, 100);  
@@ -182,11 +192,44 @@ void icicle_mode()
     if (icicle_pos > NUM_LEDS+1)
     {
       icicle_animate = false;
-      icicle_pauser = false;
       icicle_pos=0;
       fill_solid(leds, NUM_LEDS, CRGB::Black);
     }
   }
+}
+
+void setIcicleAnimate()
+{
+  msg_queue.push_front("Starting new icicle.");
+  icicle_animate=true;
+  icicle_new_interval=random(icicle_new_min, icicle_new_max);
+  String mymsg = "Icicle new timer now is: " + icicle_new_interval;
+  msg_queue.push_front(mymsg);
+}
+
+void icicle_mode()
+{
+  if (icicle_velocity_interval<=0)
+  {
+    msg_queue.push_front("began velocity timer.");
+    icicle_velocity_interval=bpm_millis;
+  }
+  if (icicle_new_interval<=0)
+  {
+    msg_queue.push_front("began new timer.");
+    icicle_new_interval=random(icicle_new_min, icicle_new_max);
+  }
+  if (em_icicle_new > icicle_new_interval)
+  {
+    setIcicleAnimate();
+    em_icicle_new=0;
+  }
+  if (em_icicle_velocity > icicle_velocity_interval)
+  {
+    doIcicle();
+    em_icicle_velocity=0;
+  }
+  
 }
 
 void red_voob()
@@ -195,17 +238,6 @@ void red_voob()
   fill_solid(leds, NUM_LEDS, CHSV(0,255,bright));
 }
 
-void process_packet()
-{
-  Serial.print("Received packet: ");
-  Serial.println(incomingPacket);
-  JsonObject& input = jsonBuffer.parseObject(incomingPacket);
-  if (input["mode"])
-    mode_setting=input["mode"];
-  if (input["bpm"])
-    set_bpm(atoi(input["bpm"]));
-    
-}
   
 
 void black()
@@ -335,6 +367,34 @@ void gradient_mode()
   fill_gradient_RGB(leds, NUM_LEDS/2+1, midclr, NUM_LEDS, endclr);  
 }
 
+
+void loop() {  
+  FastLED.delay(min_millis);
+  udpCheck();
+  modeSelection();
+  if (em_status_screen > status_screen_interval)
+  {
+    doStatusScreen();
+    em_status_screen=0;
+  }
+
+}
+
+void set_bpm(int _bpm)
+{
+  bpm = _bpm;
+  bpm_millis = 60000/bpm;
+  sprintf(msg,"BPM set to: %d (millis: %d)", bpm, bpm_millis);
+  msg_queue.push_front(msg);
+}
+
+
+
+//**********************************************************************
+//*
+//* Network stuff (UDP)
+//*
+//*********************************************************************
 void udpCheck()
 {
   //udp handling
@@ -350,18 +410,49 @@ void udpCheck()
     }     
   
 }
-void loop() {  
-  FastLED.delay(min_millis);
-  udpCheck();
-  modeSelection();
-//  t.update();
-}
 
-void set_bpm(int _bpm)
+void process_packet()
 {
-  bpm = _bpm;
-  bpm_millis = 60000/bpm;
-  sprintf(msg,"BPM set to: %d (millis: %d)", bpm, bpm_millis);
-  Serial.println(msg);
+  sprintf(msg, "Received packet: %s",incomingPacket);
+  msg_queue.push_front(msg);
+  JsonObject& input = jsonBuffer.parseObject(incomingPacket);
+  if (input["mode"])
+    mode_setting=input["mode"];
+  if (input["bpm"])
+  {
+    set_bpm(atoi(input["bpm"]));
+    icicle_velocity_interval=bpm_millis;
+  }
+  if (input["icicle_new_min"])
+  {
+    icicle_new_min=input["icicle_new_min"];
+    if (icicle_new_min < min_millis)
+      icicle_new_min=min_millis;
+    if (icicle_new_interval)
+    {
+      icicle_new_interval=random(icicle_new_min, icicle_new_max);
+      String timermsg = "Icicle new timer now is: " + newtime;
+      msg_queue.push_front(timermsg);
+    }
+  }
+  if (input["icicle_new_max"])
+  {
+    icicle_new_max=input["icicle_new_max"];
+        if (icicle_new_interval)
+    {
+      icicle_new_interval=random(icicle_new_min, icicle_new_max);
+      String timermsg = "Icicle new timer now is: " + icicle_new_interval;
+      msg_queue.push_front(timermsg);
+    }
+
+  }
+  if (input["icicle_wait_min"])
+  {
+    icicle_wait_min=input["icicle_wait_min"];
+    if (icicle_wait_min < min_millis)
+      icicle_wait_min=min_millis;
+  }
+  if (input["icicle_wait_max"])
+    icicle_wait_min=input["icicle_wait_max"];      
 }
 
