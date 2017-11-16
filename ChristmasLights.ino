@@ -8,6 +8,7 @@
 #include <ESP8266WiFi.h>
 #include <QList.h>
 #include <QList.cpp>
+#include <WiFiUdp.h>
 
 #include "auth.h"
 
@@ -31,6 +32,10 @@ QList<String> msg_queue;
 
 CRGB leds[NUM_LEDS];
 CRGB endclr, midclr;
+
+WiFiUDP ntpUDP;
+
+NTPClient ntp(ntpUDP, "us.pool.ntp.org");
 
 DynamicJsonBuffer jsonBuffer;
 char msg[255];
@@ -94,7 +99,8 @@ void doStatusScreen()
   Serial.write(27);
   Serial.print("[H");     // cursor to home command
 
-  Serial.println("Messages:");
+  sprintf(msg,"(%s) Messages:\n", ntp.getFormattedTime().c_str());
+  Serial.println(msg);
   while (msg_queue.size() > 0)
   {
     String msg = msg_queue.front();
@@ -383,13 +389,15 @@ void gradient_mode()
 
 void loop() {  
   FastLED.delay(min_millis);
-  httpServer.handleClient();
   modeSelection();
   if (em_status_screen > status_screen_interval)
   {
     doStatusScreen();
     em_status_screen=0;
   }
+  // Networky stuff
+  httpServer.handleClient();
+  ntp.update();
 
 }
 
