@@ -1,8 +1,10 @@
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <ESP8266HTTPUpdateServer.h>
 #include <ArduinoJson.h>
 #include "elapsedMillis.h"
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
-#include <WiFiUDP.h>
 #include "auth.h"
 #include "QList.h"
 #include "QList.cpp"
@@ -33,6 +35,8 @@ static int min_millis=1000/FRAMES_PER_SEC;
 
 int newtime=0;
 
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
 //mode settings
 int mode_setting=0;
 int bpm=20;
@@ -60,10 +64,8 @@ int swipe_sin1 = 0;
 int swipe_sin2 = 0;
 
 
-unsigned int udp_port = 1225;
 char incomingPacket[255];
 
-WiFiUDP udp;
 
 void initialize_wifi()
 {
@@ -80,7 +82,6 @@ void initialize_wifi()
   msg_queue.push_front(mymsg);
   delay(1000);
   WiFi.setAutoReconnect(true);
-  udp.begin(udp_port);
 }
 
 void doStatusScreen()
@@ -104,11 +105,19 @@ void setup() {
   // put your setup code here, to run once:
  Serial.begin(74880);
  delay(3000); 
+ MDNS.begin(WiFi.hostname().c_str());
+ httpUpdater.setup(&httpServer);
+ httpServer.on("/lights", HTTP_POST, process_post);
+ httpServer.begin();
+ MDNS.addService("http", "tcp", 80);
+ 
+
  FastLED.addLeds<BOARD, PIN, COLOR_ORDER>(leds, NUM_LEDS);
  fill_solid(leds, NUM_LEDS, CRGB::Blue);
  FastLED.show();
  initialize_wifi();
  sprintf(msg, "Initialized.  Frame rate dictates minimum refresh rate of: %d", min_millis);
+ msg_queue.push_front(msg);
  randomSeed(analogRead(0));
  set_bpm(20);
 }
@@ -200,11 +209,12 @@ void doIcicle()
 
 void setIcicleAnimate()
 {
-  msg_queue.push_front("Starting new icicle.");
+  sprintf(msg,"Starting new icicle.");
+  msg_queue.push_front(msg);
   icicle_animate=true;
   icicle_new_interval=random(icicle_new_min, icicle_new_max);
-  String mymsg = "Icicle new timer now is: " + icicle_new_interval;
-  msg_queue.push_front(mymsg);
+  sprintf(msg, "Icicle new timer set to: %d", icicle_new_interval);
+  msg_queue.push_front(msg);
 }
 
 void icicle_mode()
@@ -370,7 +380,7 @@ void gradient_mode()
 
 void loop() {  
   FastLED.delay(min_millis);
-  udpCheck();
+  httpServer.handleClient();
   modeSelection();
   if (em_status_screen > status_screen_interval)
   {
@@ -390,32 +400,10 @@ void set_bpm(int _bpm)
 
 
 
-//**********************************************************************
-//*
-//* Network stuff (UDP)
-//*
-//*********************************************************************
-void udpCheck()
-{
-  //udp handling
-    int packetSize = udp.parsePacket();
-    if (packetSize)
-    {
-      int len = udp.read(incomingPacket, 255);
-      if (len >0)
-      {
-        incomingPacket[len]=0;
-      }
-      process_packet();
-    }     
-  
-}
 
-void process_packet()
+void process_post()
 {
-  sprintf(msg, "Received packet: %s",incomingPacket);
-  msg_queue.push_front(msg);
-  JsonObject& input = jsonBuffer.parseObject(incomingPacket);
+  JsonObject& input = jsonBuffer.parseObject(httpServer.arg("plain"));
   if (input["mode"])
     mode_setting=input["mode"];
   if (input["bpm"])
@@ -454,5 +442,10 @@ void process_packet()
   }
   if (input["icicle_wait_max"])
     icicle_wait_min=input["icicle_wait_max"];      
+  httpServer.send ( 200, "text/json", "{\"done\":true}" );    
 }
+
+
+  
+
 
