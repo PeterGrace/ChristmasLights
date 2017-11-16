@@ -3,12 +3,16 @@
         {
             "name": "Win32",
             "includePath": [
-                "C:\\Users\\peteg\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\cores\\esp8266"
+                "C:\\Users\\peteg\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\cores\\esp8266",
+                "C:\\Users\\peteg\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\libraries\\*",
+                "C:\\Users\\peteg\\Documents\\Arduino\\Libraries\\*"
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": false,
                 "path": [
-                    "C:\\Users\\peteg\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\cores\\esp8266"
+                    "C:\\Users\\peteg\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\cores\\esp8266",
+                    "C:\\Users\\peteg\\Documents\\Arduino\\Libraries",
+                    "C:\\Users\\peteg\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\libraries"
                 ]
             },
             "intelliSenseMode": "msvc-x64"
