@@ -3,5 +3,5 @@
     "configuration": "CpuFrequency=80,UploadSpeed=115200,FlashSize=4M3M",
     "sketch": "ChristmasLights.ino",
     "output": "build/",
-    "port": "COM3"
+    "port": "COM8"
 }

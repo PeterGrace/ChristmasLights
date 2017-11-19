@@ -4,7 +4,6 @@
 #include <ArduinoJson.h>
 #include <NTPClient.h>
 #include <elapsedMillis.h>
-#include <FastLED.h>
 #include <ESP8266WiFi.h>
 #include <QList.h>
 #include <QList.cpp>
@@ -12,11 +11,13 @@
 
 #include "auth.h"
 
+#define FASTLED_ALLOW_INTERRUPTS 0
+#include <FastLED.h>
 
-#define BOARD TM1803
+#define BOARD WS2812B
 #define PIN 5
-#define NUM_LEDS 10
-#define COLOR_ORDER RBG
+#define NUM_LEDS 123
+#define COLOR_ORDER RGB
 
 #define FADE_VALUE 10
 
@@ -99,7 +100,7 @@ void doStatusScreen()
   Serial.write(27);
   Serial.print("[H");     // cursor to home command
 
-  sprintf(msg,"(%s) Messages:\n", ntp.getFormattedTime().c_str());
+  sprintf(msg,"(%s) (%s) Messages:\n", ntp.getFormattedTime().c_str(), WiFi.localIP().toString().c_str());
   Serial.println(msg);
   while (msg_queue.size() > 0)
   {
