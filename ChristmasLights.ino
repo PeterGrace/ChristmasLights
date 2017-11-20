@@ -28,6 +28,8 @@ elapsedMillis em_status_screen=0;
 elapsedMillis em_icicle_velocity=0;
 elapsedMillis em_icicle_new=0;
 
+uint8_t global_brightness=255;
+
 int status_screen_interval=1000;
 
 QList<const char *> msg_queue;
@@ -127,6 +129,7 @@ void setup() {
  
 
  FastLED.addLeds<BOARD, PIN, COLOR_ORDER>(leds, NUM_LEDS);
+ set_brightness(255);
  fill_solid(leds, NUM_LEDS, CRGB::Blue);
  FastLED.show();
  initialize_wifi();
@@ -480,6 +483,8 @@ void process_post()
   JsonObject& input = jsonBuffer.parseObject(httpServer.arg("plain"));
   if (input["mode"])
     mode_setting=input["mode"];
+  if (input["brightness"])
+    set_brightness(atoi(input["brightness"]));
   if (input["bpm"])
   {
     set_bpm(atoi(input["bpm"]));
@@ -519,6 +524,13 @@ void process_post()
   httpServer.send ( 200, "text/json", "{\"done\":true}" );    
 }
 
+void set_brightness(uint8_t brightness)
+{
+  global_brightness=brightness;
+  String msg = "Setting brightness level to: " + global_brightness;
+  msg_queue.push_front(msg.c_str());
+  FastLED.setBrightness(global_brightness);
+}
 
   
 
