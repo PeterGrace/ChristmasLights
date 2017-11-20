@@ -5,9 +5,10 @@
 #include <NTPClient.h>
 #include <elapsedMillis.h>
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
+#include <RemoteDebug.h>
 #include <QList.h>
 #include <QList.cpp>
-#include <WiFiUdp.h>
 
 #include "auth.h"
 
@@ -17,7 +18,7 @@
 #define BOARD WS2812B
 #define PIN 5
 #define NUM_LEDS 123
-#define COLOR_ORDER RGB
+#define COLOR_ORDER GRB
 
 #define FADE_VALUE 10
 
@@ -27,19 +28,23 @@ elapsedMillis em_status_screen=0;
 elapsedMillis em_icicle_velocity=0;
 elapsedMillis em_icicle_new=0;
 
-int status_screen_interval=5000;
+int status_screen_interval=1000;
 
-QList<String> msg_queue;
+QList<const char *> msg_queue;
 
+String newicicle="Starting new icicle";
+String new_begin="Beginning new icicle timer";
+String new_animate="Beginning velocity timer";
+String icicledelay="icicle was due to start, but we're still animating.  Resetting timer.";
 CRGB leds[NUM_LEDS];
 CRGB endclr, midclr;
 
 WiFiUDP ntpUDP;
+RemoteDebug debug;
 
 NTPClient ntp(ntpUDP, "us.pool.ntp.org");
 
 DynamicJsonBuffer jsonBuffer;
-char msg[255];
 static int min_millis=1000/FRAMES_PER_SEC;
 
 int newtime=0;
@@ -48,8 +53,8 @@ ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
 //mode settings
 int mode_setting=0;
-int bpm=20;
-long bpm_millis=60000/bpm;
+int global_bpm=20;
+long bpm_millis=60000/global_bpm;
 
 // voob settings
 int voob_color=0;
@@ -59,37 +64,34 @@ int icicle_pos=0;
 int icicle_velocity_interval=0;
 int icicle_new_interval=0;
 bool icicle_animate=false;
-int icicle_new_min=2000;
-int icicle_new_max=5000;
+int icicle_new_min=5000;
+int icicle_new_max=10000;
 int icicle_wait_min=min_millis;
-int icicle_wait_max=1000;
-
-//pattern mode
-int pattern_time = 3000;
-
+int icicle_wait_max=10000;
 
 //swipe mode
 int swipe_sin1 = 0;
 int swipe_sin2 = 0;
 
+uint8_t gHue = 0;
 
-char incomingPacket[255];
-
+int chase_pos=0;
 
 void initialize_wifi()
 {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  sprintf(msg, "Trying to connect to ssid %s with password %s.\n", ssid, password);
-  msg_queue.push_front(msg);
+  String trying ="Trying to connect to wifi";
+  msg_queue.push_front(trying.c_str());
+  debug.begin(WiFi.hostname().c_str());
   while (WiFi.localIP().toString() == "0.0.0.0")
   {
     delay(500);
-    msg_queue.push_front(WiFi.localIP().toString());
+    String ipmsg = "IP:" + WiFi.localIP().toString();
+    msg_queue.push_front(ipmsg.c_str());
   }
-  String mymsg="Connected to wifi with ip " + WiFi.localIP().toString();
-  msg_queue.push_front(mymsg);
-  delay(1000);
+  String connectedmsg = "Connected to wifi with ip " + WiFi.localIP().toString();
+  msg_queue.push_front(connectedmsg.c_str());
   WiFi.setAutoReconnect(true);
 }
 
@@ -100,13 +102,15 @@ void doStatusScreen()
   Serial.write(27);
   Serial.print("[H");     // cursor to home command
 
-  sprintf(msg,"(%s) (%s) Messages:\n", ntp.getFormattedTime().c_str(), WiFi.localIP().toString().c_str());
-  Serial.println(msg);
+  String header = "("+ntp.getFormattedTime()+") ("+WiFi.localIP().toString()+") Messages:\n";
+  Serial.println(header.c_str());
   while (msg_queue.size() > 0)
   {
-    String msg = msg_queue.front();
+    String msg;
+    msg = msg_queue.back();
     Serial.println(msg);
-    msg_queue.pop_front();
+    debug.println(msg);
+    msg_queue.pop_back();
   }
 }
 
@@ -126,8 +130,8 @@ void setup() {
  fill_solid(leds, NUM_LEDS, CRGB::Blue);
  FastLED.show();
  initialize_wifi();
- sprintf(msg, "Initialized.  Frame rate dictates minimum refresh rate of: %d", min_millis);
- msg_queue.push_front(msg);
+ String initialized="Initialized.  Frame rate dictates minimum refresh rate of: " + min_millis;
+ msg_queue.push_front(initialized.c_str());
  randomSeed(analogRead(0));
  set_bpm(20);
 }
@@ -141,6 +145,34 @@ void random_colors()
         voob_color = random(0,4);
       }
     }
+}
+
+void confetti_mode() 
+{
+  // random colored speckles that blink in and fade smoothly
+  fadeToBlackBy( leds, NUM_LEDS, 10);
+  int pos = random16(NUM_LEDS);
+  leds[pos] += CHSV( random8(255), 200, 255);
+}
+
+void rainbow_solid()
+{
+  fill_rainbow(leds, NUM_LEDS, 0, 7);
+}
+
+void rainbow_bpm()
+{
+  uint8_t beatA = beatsin8(global_bpm, 0, 255);
+  fill_rainbow(leds, NUM_LEDS, beatA, 7);
+}
+
+void murica_chase()
+{
+  fadeToBlackBy( leds, NUM_LEDS, 10);
+  uint8_t pos=beatsin8(global_bpm,1,NUM_LEDS-1);
+  leds[pos-1]=CRGB(CRGB::Red);
+  leds[pos]=CRGB(CRGB::White);
+  leds[pos+1]=CRGB(CRGB::Blue);
 }
 
 void solid_mode()
@@ -174,7 +206,7 @@ void solid_mode()
 
 void voob_mode()
 {
-    uint8_t bright = beatsin8(bpm,0,255);
+    uint8_t bright = beatsin8(global_bpm,0,255);
     switch (voob_color)
     {
       case 0: {
@@ -219,24 +251,35 @@ void doIcicle()
 
 void setIcicleAnimate()
 {
-  sprintf(msg,"Starting new icicle.");
-  msg_queue.push_front(msg);
-  icicle_animate=true;
-  icicle_new_interval=random(icicle_new_min, icicle_new_max);
-  sprintf(msg, "Icicle new timer set to: %d", icicle_new_interval);
-  msg_queue.push_front(msg);
+  if (icicle_animate==false)
+  {
+    msg_queue.push_front(newicicle.c_str());
+    icicle_animate=true;
+    icicle_new_interval=random(icicle_new_min, icicle_new_max);
+    String newtimer = "Icicle new timer set to: " + icicle_new_interval;
+    msg_queue.push_front(newtimer.c_str());
+  }
+  else
+  {
+    msg_queue.push_front(icicledelay.c_str());
+    icicle_new_interval=random(icicle_new_min, icicle_new_max);
+    String newtimer = "Icicle new timer set to: " + icicle_new_interval;
+    msg_queue.push_front(newtimer.c_str());
+    
+  }
 }
 
 void icicle_mode()
 {
   if (icicle_velocity_interval<=0)
   {
-    msg_queue.push_front("began velocity timer.");
+    msg_queue.push_front(new_animate.c_str());
     icicle_velocity_interval=bpm_millis;
   }
   if (icicle_new_interval<=0)
   {
-    msg_queue.push_front("began new timer.");
+    msg_queue.push_front(new_begin.c_str());
+    
     icicle_new_interval=random(icicle_new_min, icicle_new_max);
   }
   if (em_icicle_new > icicle_new_interval)
@@ -254,7 +297,7 @@ void icicle_mode()
 
 void red_voob()
 {
-  uint8_t bright = beatsin8(bpm,0,255);
+  uint8_t bright = beatsin8(global_bpm,0,255);
   fill_solid(leds, NUM_LEDS, CHSV(0,255,bright));
 }
 
@@ -279,6 +322,22 @@ void modeSelection()
                 icicle_mode();
                 break;
              }
+    case 3: {
+                confetti_mode();
+                break;
+            }         
+    case 4: {
+                rainbow_solid();
+                break;
+            } 
+    case 5: {
+                rainbow_bpm();
+                break;
+    }                   
+    case 6: {
+                murica_chase();
+                break;
+    }
     case 10: {
                 //red voob only
                 voob_color=0;
@@ -354,24 +413,21 @@ void modeSelection()
 
 void swipe_redgreen()
 {
-    swipe_sin1=beatsin8(bpm, 0, NUM_LEDS,0,0);
-    //swipe_sin2=beatsin8(bpm, 0, NUM_LEDS,0,90);
+    swipe_sin1=beatsin8(global_bpm, 0, NUM_LEDS,0,0);
     fill_gradient_RGB(leds, 0, CRGB::Green, swipe_sin1, CRGB::Red);
     fill_gradient_RGB(leds, swipe_sin1, CRGB::Red, NUM_LEDS, CRGB::Green);
 }
 
 void swipe_redblue()
 {
-    swipe_sin1=beatsin8(bpm, 0, NUM_LEDS,0,0);
-    //swipe_sin2=beatsin8(bpm, 0, NUM_LEDS,0,90);
+    swipe_sin1=beatsin8(global_bpm, 0, NUM_LEDS,0,0);
     fill_gradient_RGB(leds, 0, CRGB::Blue, swipe_sin1, CRGB::Red);
     fill_gradient_RGB(leds, swipe_sin1, CRGB::Red, NUM_LEDS, CRGB::Blue);
 }
 
 void swipe_bluegreen()
 {
-    swipe_sin1=beatsin8(bpm, 0, NUM_LEDS,0,0);
-    //swipe_sin2=beatsin8(bpm, 0, NUM_LEDS,0,90);
+    swipe_sin1=beatsin8(global_bpm, 0, NUM_LEDS,0,0);
     fill_gradient_RGB(leds, 0, CRGB::Blue, swipe_sin1, CRGB::Green);
     fill_gradient_RGB(leds, swipe_sin1, CRGB::Green, NUM_LEDS, CRGB::Blue);
 }
@@ -380,7 +436,7 @@ void swipe_bluegreen()
 void gradient_mode()
 {
   
-  uint8_t speed = beatsin8(bpm,0,255);
+  uint8_t speed = beatsin8(global_bpm,0,NUM_LEDS);
   endclr = blend(CRGB::Red, CRGB::Green, speed);
   midclr = blend(CRGB::Green, CRGB::Blue, speed);
   fill_gradient_RGB(leds, 0, endclr, NUM_LEDS/2, midclr);
@@ -399,15 +455,21 @@ void loop() {
   // Networky stuff
   httpServer.handleClient();
   ntp.update();
+  debug.handle();
 
 }
 
 void set_bpm(int _bpm)
 {
-  bpm = _bpm;
-  bpm_millis = 60000/bpm;
-  sprintf(msg,"BPM set to: %d (millis: %d)", bpm, bpm_millis);
-  msg_queue.push_front(msg);
+  global_bpm = _bpm;
+  bpm_millis = 60000/global_bpm;
+  char bpmmsg1[256];
+  
+  // for some reason my String operator+ was falling flat on this, so hacky workaround here...
+  sprintf(bpmmsg1,"BPM set to %d (millis: %d)",global_bpm,bpm_millis);
+  String bpmmsg=bpmmsg1;
+  //I do this this way, because my QList is const char*.  If I wasn't using the const, I could just shove the msg in directly.
+  msg_queue.push_front(bpmmsg.c_str());
 }
 
 
@@ -431,8 +493,8 @@ void process_post()
     if (icicle_new_interval)
     {
       icicle_new_interval=random(icicle_new_min, icicle_new_max);
-      String timermsg = "Icicle new timer now is: " + newtime;
-      msg_queue.push_front(timermsg);
+      String resettimer = "Icicle new timer now is: " + newtime; 
+      msg_queue.push_front(resettimer.c_str());
     }
   }
   if (input["icicle_new_max"])
@@ -441,8 +503,8 @@ void process_post()
         if (icicle_new_interval)
     {
       icicle_new_interval=random(icicle_new_min, icicle_new_max);
-      String timermsg = "Icicle new timer now is: " + icicle_new_interval;
-      msg_queue.push_front(timermsg);
+      String resettimer = "Icicle new timer now is: " + newtime; 
+      msg_queue.push_front(resettimer.c_str());
     }
 
   }
