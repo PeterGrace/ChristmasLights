@@ -30,6 +30,8 @@ elapsedMillis em_icicle_new=0;
 
 uint8_t global_brightness=255;
 
+unsigned long pause_till=0;
+
 int status_screen_interval=1000;
 
 QList<const char *> msg_queue;
@@ -449,7 +451,14 @@ void gradient_mode()
 
 void loop() {  
   FastLED.delay(min_millis);
-  modeSelection();
+  unsigned long now=ntp.getEpochTime();
+  if ((pause_till >=0) && (now <pause_till))
+  {
+    fadeToBlackBy(leds, NUM_LEDS,100);
+  } else if ((pause_till <= 0) || (now >=pause_till))
+  {
+    modeSelection();    
+  };
   if (em_status_screen > status_screen_interval)
   {
     doStatusScreen();
@@ -483,6 +492,8 @@ void process_post()
   JsonObject& input = jsonBuffer.parseObject(httpServer.arg("plain"));
   if (input["mode"])
     mode_setting=input["mode"];
+  if (input["sync_start"])
+    pause_till=atol(input["sync_start"]);
   if (input["brightness"])
     set_brightness(atoi(input["brightness"]));
   if (input["bpm"])
