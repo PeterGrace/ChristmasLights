@@ -58,6 +58,9 @@ icicle_new_min, icicle_new_max:
 icicle_wait_min, icicle_wait_max:
   - currently not implemented, but I plan to have the drip of water occasionally pause, as I've seen on some commercial icicle strips.
 
+sync_start:
+  - Send a unixtime value in this payload and the esp8266 will fade-to-black the strip, and at the appointed unixtime, the selected pattern will start.  Might be useful for synchronizing light shows.
+
 Example
 -------
 ```curl -XPOST -d'{"mode":5,"bpm":8,"brightness":4}' http://yourip/lights```
