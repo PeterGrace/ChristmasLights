@@ -6,9 +6,6 @@
 #include <elapsedMillis.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
-#include <RemoteDebug.h>
-#include <QList.h>
-#include <QList.cpp>
 
 #include "auth.h"
 
@@ -24,6 +21,8 @@
 
 #define FRAMES_PER_SEC 60
 
+#define MAX_MSG_SIZE 255
+
 elapsedMillis em_status_screen=0;
 elapsedMillis em_icicle_velocity=0;
 elapsedMillis em_icicle_new=0;
@@ -31,22 +30,22 @@ elapsedMillis em_icicle_new=0;
 uint8_t global_brightness=255;
 
 unsigned long pause_till=0;
+unsigned long _uptime=0;
 
-int status_screen_interval=1000;
+int status_screen_interval=10000;
 
-QList<const char *> msg_queue;
 
-String newicicle="Starting new icicle";
-String new_begin="Beginning new icicle timer";
-String new_animate="Beginning velocity timer";
-String icicledelay="icicle was due to start, but we're still animating.  Resetting timer.";
+const char newicicle[]="Starting new icicle";
+const char new_begin[]="Beginning new icicle timer";
+const char new_animate[]="Beginning velocity timer";
+const char icicledelay[]="icicle was due to start, but we're still animating.  Resetting timer.";
+const char trymsg[]="Trying to connect to wifi";
 CRGB leds[NUM_LEDS];
 CRGB endclr, midclr;
 
-WiFiUDP ntpUDP;
-RemoteDebug debug;
+WiFiUDP UDP;
 
-NTPClient ntp(ntpUDP, "us.pool.ntp.org");
+NTPClient ntp(UDP, "us.pool.ntp.org");
 
 DynamicJsonBuffer jsonBuffer;
 static int min_millis=1000/FRAMES_PER_SEC;
@@ -85,39 +84,25 @@ void initialize_wifi()
 {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  String trying ="Trying to connect to wifi";
-  msg_queue.push_front(trying.c_str());
-  debug.begin(WiFi.hostname().c_str());
+  debugmsg(trymsg);
+  char progressmsg[MAX_MSG_SIZE];
+  //debug.begin(WiFi.hostname().c_str());
   while (WiFi.localIP().toString() == "0.0.0.0")
   {
     delay(500);
-    String ipmsg = "IP:" + WiFi.localIP().toString();
-    msg_queue.push_front(ipmsg.c_str());
+    sprintf(progressmsg,"IP: %s",WiFi.localIP().toString().c_str());
+    debugmsg(progressmsg);
   }
-  String connectedmsg = "Connected to wifi with ip " + WiFi.localIP().toString();
-  msg_queue.push_front(connectedmsg.c_str());
+  sprintf(progressmsg,"Connected to wifi with ip %s", WiFi.localIP().toString().c_str());
+  debugmsg(progressmsg);
   WiFi.setAutoReconnect(true);
 }
 
-void doStatusScreen()
+unsigned long calc_uptime()
 {
-  Serial.write(27);       // ESC command
-  Serial.print("[2J");    // clear screen command
-  Serial.write(27);
-  Serial.print("[H");     // cursor to home command
-
-  String header = "("+ntp.getFormattedTime()+") ("+WiFi.localIP().toString()+") Messages:\n";
-  Serial.println(header.c_str());
-  while (msg_queue.size() > 0)
-  {
-    String msg;
-    msg = msg_queue.back();
-    Serial.println(msg);
-    debug.println(msg);
-    msg_queue.pop_back();
-  }
+  _uptime = _uptime + (millis() - _uptime);
+  return _uptime / 1000;
 }
-
 
 void setup() {
   // put your setup code here, to run once:
@@ -135,8 +120,9 @@ void setup() {
  fill_solid(leds, NUM_LEDS, CRGB::Blue);
  FastLED.show();
  initialize_wifi();
- String initialized="Initialized.  Frame rate dictates minimum refresh rate of: " + min_millis;
- msg_queue.push_front(initialized.c_str());
+ char initialized[MAX_MSG_SIZE];
+ sprintf(initialized,"Initialized.  Frame rate dictates minimum refresh rate of: %d", min_millis);
+ debugmsg(initialized);
  randomSeed(analogRead(0));
  set_bpm(20);
 }
@@ -258,19 +244,20 @@ void setIcicleAnimate()
 {
   if (icicle_animate==false)
   {
-    msg_queue.push_front(newicicle.c_str());
+    debugmsg(newicicle);
     icicle_animate=true;
     icicle_new_interval=random(icicle_new_min, icicle_new_max);
-    String newtimer = "Icicle new timer set to: " + icicle_new_interval;
-    msg_queue.push_front(newtimer.c_str());
+    char newtimer[MAX_MSG_SIZE];
+    sprintf(newtimer,"Icicle new timer set to: %d",icicle_new_interval);
+    debugmsg(newtimer);
   }
   else
   {
-    msg_queue.push_front(icicledelay.c_str());
+    debugmsg(icicledelay);
     icicle_new_interval=random(icicle_new_min, icicle_new_max);
-    String newtimer = "Icicle new timer set to: " + icicle_new_interval;
-    msg_queue.push_front(newtimer.c_str());
-    
+    char newtimer[MAX_MSG_SIZE];
+    sprintf(newtimer,"Icicle new timer set to: %d",icicle_new_interval);
+    debugmsg(newtimer);    
   }
 }
 
@@ -278,12 +265,12 @@ void icicle_mode()
 {
   if (icicle_velocity_interval<=0)
   {
-    msg_queue.push_front(new_animate.c_str());
+    debugmsg(new_animate);
     icicle_velocity_interval=bpm_millis;
   }
   if (icicle_new_interval<=0)
   {
-    msg_queue.push_front(new_begin.c_str());
+    debugmsg(new_begin);
     
     icicle_new_interval=random(icicle_new_min, icicle_new_max);
   }
@@ -461,27 +448,25 @@ void loop() {
   };
   if (em_status_screen > status_screen_interval)
   {
-    doStatusScreen();
+    debugmsg("Still alive!");
     em_status_screen=0;
   }
   // Networky stuff
   httpServer.handleClient();
   ntp.update();
-  debug.handle();
+  //debug.handle();
 
 }
 
 void set_bpm(int _bpm)
 {
+  char bpmmsg[MAX_MSG_SIZE];
+
   global_bpm = _bpm;
   bpm_millis = 60000/global_bpm;
-  char bpmmsg1[256];
-  
-  // for some reason my String operator+ was falling flat on this, so hacky workaround here...
-  sprintf(bpmmsg1,"BPM set to %d (millis: %d)",global_bpm,bpm_millis);
-  String bpmmsg=bpmmsg1;
-  //I do this this way, because my QList is const char*.  If I wasn't using the const, I could just shove the msg in directly.
-  msg_queue.push_front(bpmmsg.c_str());
+
+  sprintf(bpmmsg, "BPM set to %d (millis: %d)", global_bpm, bpm_millis);
+  debugmsg(bpmmsg);
 }
 
 
@@ -489,6 +474,7 @@ void set_bpm(int _bpm)
 
 void process_post()
 {
+  char msg[MAX_MSG_SIZE];
   JsonObject& input = jsonBuffer.parseObject(httpServer.arg("plain"));
   if (input["mode"])
     mode_setting=input["mode"];
@@ -509,8 +495,8 @@ void process_post()
     if (icicle_new_interval)
     {
       icicle_new_interval=random(icicle_new_min, icicle_new_max);
-      String resettimer = "Icicle new timer now is: " + newtime; 
-      msg_queue.push_front(resettimer.c_str());
+      sprintf(msg,"Icicle new timer now is: %d", newtime); 
+      debugmsg(msg);
     }
   }
   if (input["icicle_new_max"])
@@ -519,8 +505,8 @@ void process_post()
         if (icicle_new_interval)
     {
       icicle_new_interval=random(icicle_new_min, icicle_new_max);
-      String resettimer = "Icicle new timer now is: " + newtime; 
-      msg_queue.push_front(resettimer.c_str());
+      sprintf(msg,"Icicle new timer now is: %d", newtime); 
+      debugmsg(msg);
     }
 
   }
@@ -537,12 +523,34 @@ void process_post()
 
 void set_brightness(uint8_t brightness)
 {
+  char msg[MAX_MSG_SIZE];
   global_brightness=brightness;
-  String msg = "Setting brightness level to: " + global_brightness;
-  msg_queue.push_front(msg.c_str());
+  sprintf(msg,"Setting brightness level to: %d",global_brightness);
+  debugmsg(msg);
   FastLED.setBrightness(global_brightness);
 }
 
-  
 
 
+void debugmsg(char *foo)
+{
+  char logmsg[MAX_MSG_SIZE];
+  char upcstr[10];
+  ltoa(calc_uptime(), upcstr, 10);
+  sprintf(logmsg,"[%s t(%s)/(%s)]: %s",WiFi.localIP().toString().c_str(), upcstr, ntp.getFormattedTime().c_str(),foo);
+
+  Serial.println(logmsg);
+  if (WiFi.isConnected())
+  {
+    UDP.beginPacket("10.65.3.241", 1225);
+    UDP.write(logmsg);
+    UDP.endPacket();
+  }
+}
+void debugmsg(const char *foo)
+{
+  // I only want to maintain the one function above, so this is hacky...
+  char msg[MAX_MSG_SIZE];
+  sprintf(msg,"%s", foo);
+  debugmsg(msg);
+}
