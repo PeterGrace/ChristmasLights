@@ -111,6 +111,7 @@ void setup() {
  MDNS.begin(WiFi.hostname().c_str());
  httpUpdater.setup(&httpServer);
  httpServer.on("/lights", HTTP_POST, process_post);
+ httpServer.on("/reboot/please", HTTP_POST, [](){httpServer.send ( 200, "text/json", "{\"done\":true}" );ESP.reset();});
  httpServer.begin();
  MDNS.addService("http", "tcp", 80);
  
