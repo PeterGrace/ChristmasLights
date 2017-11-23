@@ -6,6 +6,7 @@
 #include <elapsedMillis.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
+#include <EEPROM.h>
 
 #include "auth.h"
 
@@ -76,6 +77,12 @@ int icicle_wait_max=10000;
 int swipe_sin1 = 0;
 int swipe_sin2 = 0;
 
+// the addresses we will use to store integers in.
+#define ADDR_VALID 0
+#define ADDR_BPM 1
+#define ADDR_BRIGHT 2
+#define ADDR_MODE 3
+#define EEPROM_SIZE 64
 uint8_t gHue = 0;
 
 int chase_pos=0;
@@ -86,13 +93,15 @@ void initialize_wifi()
   WiFi.begin(ssid, password);
   debugmsg(trymsg);
   char progressmsg[MAX_MSG_SIZE];
-  //debug.begin(WiFi.hostname().c_str());
   while (WiFi.localIP().toString() == "0.0.0.0")
   {
     delay(500);
     sprintf(progressmsg,"IP: %s",WiFi.localIP().toString().c_str());
     debugmsg(progressmsg);
   }
+  int newmillis = millis()+3000;
+  while (newmillis > millis())
+    delay(1);
   sprintf(progressmsg,"Connected to wifi with ip %s", WiFi.localIP().toString().c_str());
   debugmsg(progressmsg);
   WiFi.setAutoReconnect(true);
@@ -106,26 +115,87 @@ unsigned long calc_uptime()
 
 void setup() {
   // put your setup code here, to run once:
+ EEPROM.begin(EEPROM_SIZE);
  Serial.begin(74880);
  delay(3000); 
  MDNS.begin(WiFi.hostname().c_str());
  httpUpdater.setup(&httpServer);
  httpServer.on("/lights", HTTP_POST, process_post);
- httpServer.on("/reboot/please", HTTP_POST, [](){httpServer.send ( 200, "text/json", "{\"done\":true}" );ESP.reset();});
+ httpServer.on("/reboot/please", HTTP_POST, [](){httpServer.send ( 200, "text/json", "{\"done\":true}" );ESP.restart();});
+ httpServer.on("/save/eeprom", HTTP_POST, [](){httpServer.send ( 200, "text/json", "{\"done\":true}" );cl_write_eeprom();});
+ 
  httpServer.begin();
  MDNS.addService("http", "tcp", 80);
  
 
  FastLED.addLeds<BOARD, PIN, COLOR_ORDER>(leds, NUM_LEDS);
  set_brightness(255);
- fill_solid(leds, NUM_LEDS, CRGB::Blue);
- FastLED.show();
  initialize_wifi();
  char initialized[MAX_MSG_SIZE];
  sprintf(initialized,"Initialized.  Frame rate dictates minimum refresh rate of: %d", min_millis);
  debugmsg(initialized);
  randomSeed(analogRead(0));
- set_bpm(20);
+ load_eeprom_values();
+}
+
+void cl_write_eeprom()
+{
+  char eeprommsg[MAX_MSG_SIZE];
+  EEPROM.write(ADDR_VALID, 122);
+  EEPROM.write(ADDR_MODE, mode_setting);
+  EEPROM.write(ADDR_BPM,global_bpm);
+  EEPROM.write(ADDR_BRIGHT, global_brightness);
+  EEPROM.commit();
+  sprintf(eeprommsg, "Saved to eeprom: m:%d, bpm:%d, bright:%d\n",mode_setting, global_bpm, global_brightness);
+  debugmsg(eeprommsg);
+  validate_eeprom();
+}
+
+void validate_eeprom()
+{
+  int _valid, _bpm, _bright, _mode=0;
+  char eeprommsg[MAX_MSG_SIZE];
+  _valid = EEPROM.read(ADDR_VALID);
+  _bpm = EEPROM.read(ADDR_BPM);
+  _bright = EEPROM.read(ADDR_BRIGHT);
+  _mode = EEPROM.read(ADDR_MODE);
+  sprintf(eeprommsg, "v:%d, bpm:%d, mode:%d, bright:%d",_valid,_bpm,_mode,_bright);
+  debugmsg(eeprommsg);
+}
+
+void load_eeprom_values()
+{
+  int _valid, _bpm, _bright, _mode=0;
+  _valid = EEPROM.read(ADDR_VALID);
+  char eeprommsg[MAX_MSG_SIZE];
+  sprintf(eeprommsg,"Valid came back as %d\n", _valid);    
+  debugmsg(eeprommsg);
+  if (_valid == 122)
+  {
+    _bpm = EEPROM.read(ADDR_BPM);
+    _bright = EEPROM.read(ADDR_BRIGHT);
+    _mode = EEPROM.read(ADDR_MODE);
+    sprintf(eeprommsg, "EEPROM was valid\n");
+    debugmsg(eeprommsg);
+  }
+  else
+  {
+    _bpm = 60;
+    _bright = 255;
+    _mode = 3;
+    EEPROM.write(ADDR_VALID, 122);
+    EEPROM.write(ADDR_MODE, _mode);
+    EEPROM.write(ADDR_BPM,_bpm);
+    EEPROM.write(ADDR_BRIGHT, _bright);
+    EEPROM.commit();
+    sprintf(eeprommsg, "Wrote defaults to eeprom\n",_mode,_bpm,_bright);
+    debugmsg(eeprommsg);
+
+  }
+  set_bpm(_bpm);
+  set_brightness(_bright);
+  mode_setting = _mode;
+
 }
 
 void random_colors()
@@ -541,7 +611,7 @@ void debugmsg(char *foo)
   sprintf(logmsg,"[%s t(%s)/(%s)]: %s",WiFi.localIP().toString().c_str(), upcstr, ntp.getFormattedTime().c_str(),foo);
 
   Serial.println(logmsg);
-  if (WiFi.isConnected())
+  if (WiFi.localIP().toString() != "0.0.0.0")
   {
     UDP.beginPacket("10.65.3.241", 1225);
     UDP.write(logmsg);
