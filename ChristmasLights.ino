@@ -26,6 +26,9 @@
 elapsedMillis em_status_screen=0;
 elapsedMillis em_icicle_velocity=0;
 elapsedMillis em_icicle_new=0;
+elapsedMillis em_ntp_sync=0;
+
+int ntp_sync_interval = 10000;
 
 uint8_t global_brightness=255;
 
@@ -33,6 +36,7 @@ unsigned long pause_till=0;
 unsigned long _uptime=0;
 
 int status_screen_interval=10000;
+
 
 #define VALID_VER 124
 
@@ -53,7 +57,7 @@ CRGB endclr, midclr;
 
 WiFiUDP UDP;
 
-NTPClient ntp(UDP, "us.pool.ntp.org");
+NTPClient ntp(UDP, "10.65.3.1");
 
 DynamicJsonBuffer jsonBuffer;
 static int min_millis=1000/FRAMES_PER_SEC;
@@ -507,6 +511,11 @@ void loop() {
   if ((pause_till >=0) && (now <pause_till))
   {
     fadeToBlackBy(leds, config.num_leds,100);
+    if (em_ntp_sync > ntp_sync_interval)
+    {
+      ntp.forceUpdate();
+      em_ntp_sync=0;
+    }
   } else if ((pause_till <= 0) || (now >=pause_till))
   {
     modeSelection();    
