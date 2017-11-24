@@ -2,7 +2,6 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPUpdateServer.h>
 #include <ArduinoJson.h>
-#include <NTPClient.h>
 #include <elapsedMillis.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
@@ -26,9 +25,8 @@
 elapsedMillis em_status_screen=0;
 elapsedMillis em_icicle_velocity=0;
 elapsedMillis em_icicle_new=0;
-elapsedMillis em_ntp_sync=0;
+elapsedMillis em_pause=0;
 
-int ntp_sync_interval = 10000;
 
 uint8_t global_brightness=255;
 
@@ -56,8 +54,6 @@ CRGB leds[1024];
 CRGB endclr, midclr;
 
 WiFiUDP UDP;
-
-NTPClient ntp(UDP, "10.65.3.1");
 
 DynamicJsonBuffer jsonBuffer;
 static int min_millis=1000/FRAMES_PER_SEC;
@@ -507,17 +503,13 @@ void gradient_mode()
 
 void loop() {  
   FastLED.delay(min_millis);
-  unsigned long now=ntp.getEpochTime();
-  if ((pause_till >=0) && (now <pause_till))
+  if ((pause_till >=0) && (em_pause <pause_till))
   {
     fadeToBlackBy(leds, config.num_leds,100);
-    if (em_ntp_sync > ntp_sync_interval)
-    {
-      ntp.forceUpdate();
-      em_ntp_sync=0;
-    }
-  } else if ((pause_till <= 0) || (now >=pause_till))
+  } else if ((pause_till <= 0) || (em_pause >=pause_till))
   {
+    em_pause = 0;
+    pause_till=0;
     modeSelection();    
   };
   if (em_status_screen > status_screen_interval)
@@ -527,8 +519,6 @@ void loop() {
   }
   // Networky stuff
   httpServer.handleClient();
-  ntp.update();
-  //debug.handle();
 
 }
 
@@ -553,7 +543,10 @@ void process_post()
   if (input["mode"])
     config.mode=input["mode"];
   if (input["sync_start"])
+  { 
+    em_pause=0;
     pause_till=atol(input["sync_start"]);
+  }
   if (input["brightness"])
     set_brightness(atoi(input["brightness"]));
   if (input["bpm"])
@@ -617,7 +610,7 @@ void debugmsg(char *foo)
   char logmsg[MAX_MSG_SIZE];
   char upcstr[10];
   ltoa(calc_uptime(), upcstr, 10);
-  sprintf(logmsg,"[%s t(%s)/(%s)]: %s",WiFi.localIP().toString().c_str(), upcstr, ntp.getFormattedTime().c_str(),foo);
+  sprintf(logmsg,"[%s ut(%s)]: %s",WiFi.localIP().toString().c_str(), upcstr,foo);
 
   Serial.println(logmsg);
   if (WiFi.localIP().toString() != "0.0.0.0")
