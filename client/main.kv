@@ -1,0 +1,25 @@
+<RootWidget>:
+    TabbedPanel:
+        do_default_tab: False
+        
+        TabbedPanelItem:
+            text: 'Zones'
+            BoxLayout:
+                GridLayout:
+                    CheckBox:
+        
+        TabbedPanelItem:
+            text: 'Patterns'
+            BoxLayout:
+        
+        TabbedPanelItem:
+            text: 'Colors'
+            GridLayout:
+                cols: 1
+                rows: 2
+                ColorPicker:
+                    id: cpicker
+                Button:
+                    text: "submit"
+                    id: color_button
+                    on_press: root.send_colors(cpicker)
