@@ -1,0 +1,5 @@
+POST http://10.65.3.236/eeprom/read
+
+{
+    "foo":"bar"
+}
