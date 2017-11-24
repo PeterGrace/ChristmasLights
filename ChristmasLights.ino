@@ -36,13 +36,18 @@ unsigned long _uptime=0;
 int status_screen_interval=10000;
 
 
-#define VALID_VER 124
+//#define VALID_VER 125
+//#define VALID_VER 122
+#define VALID_VER 1
+
 
 struct cl_config {
   int mode;
   int bpm;
   int brightness;
   int num_leds;
+  int hue;
+  int saturation;
 } config;
 
 const char newicicle[]="Starting new icicle";
@@ -181,6 +186,8 @@ void load_eeprom_values()
     config.brightness = 255;
     config.mode = 3;
     config.num_leds = 123;
+    config.hue = 0;
+    config.saturation = 0;
     cl_write_eeprom();
     sprintf(eeprommsg, "Wrote defaults to eeprom\n",_mode,_bpm,_bright);
     debugmsg(eeprommsg);
@@ -198,7 +205,7 @@ void random_colors()
     {
       if (leds[0].getLuma() < 1)
       {
-        voob_color = random(0,4);
+        voob_color = random(0,3);
       }
     }
 }
@@ -231,6 +238,13 @@ void murica_chase()
   leds[pos+1]=CRGB(CRGB::Blue);
 }
 
+void hsv_mode()
+{
+  fill_solid(leds, config.num_leds, CHSV(config.hue, config.saturation, config.brightness));
+}
+
+
+
 void solid_mode()
 {
   uint8_t bright = 255;
@@ -256,7 +270,7 @@ void solid_mode()
                 fill_solid(leds, config.num_leds, CHSV(32,255,bright));
                 break;
               }
-      }
+            }
 
 }
 
@@ -453,6 +467,10 @@ void modeSelection()
                swipe_bluegreen();        
                break;
               }
+    case 90: {
+              hsv_mode();
+              break;
+              }          
     case 99: { 
                gradient_mode();
                break;
@@ -587,10 +605,22 @@ void process_post()
     icicle_wait_min=input["icicle_wait_max"];      
   if (input["num_leds"])
     {
-      sprintf(msg,"Received %s from packet, writing %d to config.\n",input["num_leds"], atoi(input["num_leds"]));
-      debugmsg(msg);
       config.num_leds = atoi(input["num_leds"]);
     }
+  if (input["hue"])
+    {
+      config.hue = atoi(input["hue"]);
+      sprintf(msg,"Setting hue to %d", config.hue);
+      debugmsg(msg);
+
+    }
+  if (input["saturation"])
+    {
+      config.saturation = atoi(input["saturation"]);
+      sprintf(msg,"Setting saturdation to %d", config.saturation);
+      debugmsg(msg);
+    }
+  
     httpServer.send ( 200, "text/json", "{\"done\":true}" );    
 }
 
