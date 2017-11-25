@@ -6,6 +6,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <EEPROM.h>
+#include <ESP8266SSDP.h>
 
 #include "auth.h"
 
@@ -28,8 +29,6 @@ elapsedMillis em_icicle_new=0;
 elapsedMillis em_pause=0;
 
 
-uint8_t global_brightness=255;
-
 unsigned long pause_till=0;
 unsigned long _uptime=0;
 
@@ -38,7 +37,7 @@ int status_screen_interval=10000;
 
 //#define VALID_VER 125
 //#define VALID_VER 122
-#define VALID_VER 1
+#define VALID_VER 2
 
 
 struct cl_config {
@@ -48,6 +47,7 @@ struct cl_config {
   int num_leds;
   int hue;
   int saturation;
+  char zone[32];
 } config;
 
 const char newicicle[]="Starting new icicle";
@@ -90,10 +90,25 @@ int swipe_sin2 = 0;
 // the addresses we will use to store integers in.
 #define ADDR_VALID 0
 #define ADDR_CONFIG 1
-#define EEPROM_SIZE 64
+#define EEPROM_SIZE 128
 uint8_t gHue = 0;
 
 int chase_pos=0;
+
+void initialize_ssdp()
+{
+  char name[255];
+  SSDP.setSchemaURL("description.xml");
+  SSDP.setHTTPPort(80);
+  SSDP.setURL("index.html");
+  sprintf(name,"PG Lights - %s", config.zone);
+  SSDP.setName(name);
+  SSDP.setModelName("Adafruit HUZZAH");
+  SSDP.setSerialNumber(ESP.getChipId());
+  SSDP.setManufacturer("Adafruit");
+  SSDP.setDeviceType("urn:schemas-upnp-org:device:ControllableLight:1");
+  SSDP.begin();
+}
 
 void initialize_wifi()
 {
@@ -125,9 +140,9 @@ void setup() {
   // put your setup code here, to run once:
  EEPROM.begin(EEPROM_SIZE);
  Serial.begin(74880);
- initialize_wifi(); 
- delay(3000); 
  load_eeprom_values(); 
+ initialize_wifi(); 
+ initialize_ssdp();
  
  MDNS.begin(WiFi.hostname().c_str());
  httpUpdater.setup(&httpServer);
@@ -135,13 +150,13 @@ void setup() {
  httpServer.on("/reboot/please", HTTP_POST, [](){httpServer.send ( 200, "text/json", "{\"done\":true}" );ESP.restart();});
  httpServer.on("/eeprom/write", HTTP_POST, [](){httpServer.send ( 200, "text/json", "{\"done\":true}" );cl_write_eeprom();});
  httpServer.on("/eeprom/read", HTTP_POST, [](){httpServer.send ( 200, "text/json", "{\"done\":true}" );validate_eeprom();});
- 
+ httpServer.on("/description.xml", HTTP_GET, [](){SSDP.schema(httpServer.client());});
  httpServer.begin();
  MDNS.addService("http", "tcp", 80);
  
 
  FastLED.addLeds<BOARD, PIN, COLOR_ORDER>(leds, config.num_leds);
- set_brightness(255);
+ set_brightness(config.brightness);
  char initialized[MAX_MSG_SIZE];
  sprintf(initialized,"Initialized.  Frame rate dictates minimum refresh rate of: %d", min_millis);
  debugmsg(initialized);
@@ -188,6 +203,7 @@ void load_eeprom_values()
     config.num_leds = 123;
     config.hue = 0;
     config.saturation = 0;
+    sprintf(config.zone,"Default Zone");
     cl_write_eeprom();
     sprintf(eeprommsg, "Wrote defaults to eeprom\n",_mode,_bpm,_bright);
     debugmsg(eeprommsg);
@@ -617,7 +633,13 @@ void process_post()
   if (input["saturation"])
     {
       config.saturation = atoi(input["saturation"]);
-      sprintf(msg,"Setting saturdation to %d", config.saturation);
+      sprintf(msg,"Setting saturation to %d", config.saturation);
+      debugmsg(msg);
+    }
+    if (input["zone"])
+    {
+      sprintf(config.zone, "%32s",input["zone"]);
+      sprintf(msg,"Setting zone to %s", config.zone);
       debugmsg(msg);
     }
   
@@ -627,10 +649,10 @@ void process_post()
 void set_brightness(uint8_t brightness)
 {
   char msg[MAX_MSG_SIZE];
-  global_brightness=brightness;
-  sprintf(msg,"Setting brightness level to: %d",global_brightness);
+  config.brightness=brightness;
+  sprintf(msg,"Setting brightness level to: %d",config.brightness);
   debugmsg(msg);
-  FastLED.setBrightness(global_brightness);
+  FastLED.setBrightness(config.brightness);
 }
 
 
