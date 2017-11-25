@@ -1,0 +1,22 @@
+{
+    "root": {
+        "@xmlns": "urn:schemas-upnp-org:device-1-0",
+        "specVersion": {
+            "major": "1",
+            "minor": "0"
+        },
+        "URLBase": "http://10.65.3.236:80/",
+        "device": {
+            "deviceType": "urn:schemas-upnp-org:device:ControllableLight:1",
+            "friendlyName": "PG Lights - Default Zone",
+            "presentationURL": "index.html",
+            "serialNumber": "00056428",
+            "modelName": "Adafruit HUZZAH",
+            "modelNumber": null,
+            "modelURL": null,
+            "manufacturer": "Adafruit",
+            "manufacturerURL": null,
+            "UDN": "uuid:38323636-4558-4dda-9188-cda0e6056428"
+        }
+    }
+}
