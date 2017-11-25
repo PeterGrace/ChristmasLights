@@ -6,7 +6,10 @@
             text: 'Zones'
             BoxLayout:
                 GridLayout:
-                    CheckBox:
+                    Button:
+                        text: "Refresh"
+                        id: zone_refresh_button
+                        on_press: root.refresh_zones()
         
         TabbedPanelItem:
             text: 'Patterns'
