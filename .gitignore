@@ -1,3 +1,4 @@
 build/*
 auth\.h
 *.bin
+*.pyc
