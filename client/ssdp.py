@@ -1,9 +1,14 @@
 import socket
-import requests
+import httpx
 import xmltodict
 import json
 import re
+import asyncio
 import netifaces
+from async_gui.toolkits.kivy import KivyEngine
+
+engine = KivyEngine()
+
 msg = \
     'M-SEARCH * HTTP/1.1\r\n' \
     'HOST:239.255.255.250:1900\r\n' \
@@ -20,7 +25,8 @@ ifip = netifaces.ifaddresses(ifidx)[netifaces.AF_INET][0]['addr']
 s.bind((ifip, 65507))
 
 # Set up UDP socket
-def getSSDP():
+@engine.async
+def getSSDP(callback):
 
     s.sendto(msg.encode('ascii'), ('239.255.255.250', 1900) )
     s.sendto(msg.encode('ascii'), ('239.255.255.250', 1900) )
@@ -37,9 +43,9 @@ def getSSDP():
             if m is not None:
                     loc=m.group(1)
                     print("Going to get data from {}".format(loc))
-                    resp = requests.get(loc)
+                    resp = httpx.get(loc)
                     respdict=xmltodict.parse(resp.text)
-                    return respdict
+                    callback(respdict)
 
     except socket.timeout:
         print("Socket timeout")

@@ -1,94 +1,135 @@
-<RootWidget>:
-    TabbedPanel:
-        do_default_tab: False
-        
-        TabbedPanelItem:
-            text: 'Zones'
-            BoxLayout:
-                GridLayout:
-                    rows: 2
-                    Button:
-                        text: "Refresh"
-                        id: btn_refresh
-                        on_press: root.refresh_zones()
-                    Button:
-                        text: "Reboot Unit"
-                        id: btn_reboot
-                        on_press: root.reboot_unit()
-        
-        TabbedPanelItem:
-            text: 'Patterns'
-            BoxLayout:
-                GridLayout:
-                    rows: 4
-                    Button:
-                        text: "Random"
-                        id: random_mode
-                        on_press: root.set_mode(1)
-                    Button:
-                        text: "Icicle"
-                        id: icicle_mode
-                        on_press: root.set_mode(2)
-                    Button:
-                        text: "Confetti"
-                        id: confetti_mode
-                        on_press: root.set_mode(3)
-                    Button:
-                        text: "Rainbow"
-                        id: rainbow_mode
-                        on_press: root.set_mode(4)
-                    Button:
-                        text: "Rainbow BPM"
-                        id: rainbow_bpm
-                        on_press: root.set_mode(5)
-                    Button:
-                        text: "'murica Chase"
-                        id: murica_chase
-                        on_press: root.set_mode(6)
-                    Button:
-                        text: "Red Voob"
-                        id: red_voob
-                        on_press: root.set_mode(10)
-                    Button:
-                        text: "Green Voob"
-                        id: green_voob
-                        on_press: root.set_mode(20)
-                    Button:
-                        text: "Blue Voob"
-                        id: blue_voob
-                        on_press: root.set_mode(30)
-                    Button:
-                        text: "Orange Voob"
-                        id: orange_voob
-                        on_press: root.set_mode(40)
-                    Button:
-                        text: "Red/Green Swipe"
-                        id: redgreen_swipe
-                        on_press: root.set_mode(50)
-                    Button:
-                        text: "Red/Blue Swipe"
-                        id: redblue_swipe
-                        on_press: root.set_mode(51)
-                    Button:
-                        text: "Blue/Green Swipe"
-                        id: bluegreen_swipe
-                        on_press: root.set_mode(52)
-                    Button:
-                        text: "Gradient"
-                        id: gradient_mode
-                        on_press: root.set_mode(99)
+#:import Toolbar kivymd.toolbar.Toolbar
+#:import ThemeManager kivymd.theming.ThemeManager
+#:import MDNavigationDrawer kivymd.navigationdrawer.MDNavigationDrawer
+#:import NavigationLayout kivymd.navigationdrawer.NavigationLayout
+#:import NavigationDrawerDivider kivymd.navigationdrawer.NavigationDrawerDivider
+#:import NavigationDrawerToolbar kivymd.navigationdrawer.NavigationDrawerToolbar
+#:import NavigationDrawerSubheader kivymd.navigationdrawer.NavigationDrawerSubheader
+#:import get_color_from_hex kivy.utils.get_color_from_hex
+#:import colors kivymd.color_definitions.colors
 
-                    
-                
-        
-        TabbedPanelItem:
-            text: 'Colors'
-            GridLayout:
-                cols: 1
-                rows: 2
-                ColorPicker:
-                    id: cpicker
-                Button:
-                    text: "submit"
-                    id: color_button
-                    on_press: root.send_colors(cpicker)
+
+<RootWidget>:
+    NavigationLayout:
+        id: nav_layout
+        MDNavigationDrawer:
+            id: nav_drawer
+            NavigationDrawerToolbar:
+                title: "Menu"
+            NavigationDrawerIconButton:
+                icon: 'checkbox-blank-circle'
+                text: 'Zones'
+                on_release: app.root.ids.scr_mngr.current = 'Zones'
+            NavigationDrawerIconButton:
+                icon: 'checkbox-blank-circle'
+                text: 'Modes'
+                on_release: app.root.ids.scr_mngr.current = 'Modes'
+            NavigationDrawerIconButton:
+                icon: 'checkbox-blank-circle'
+                text: 'Colors'
+                on_release: app.root.ids.scr_mngr.current = 'Colors'
+        BoxLayout:
+            orientation: 'vertical'
+            Toolbar:
+                id: toolbar
+                title: 'Christmas Lights UI'
+                md_bg_color: app.theme_cls.primary_color
+                background_palette: 'Primary'
+                background_hue: '500'
+                left_action_items: [['menu', lambda x: app.root.ids.nav_layout.toggle_nav_drawer()]]
+                right_action_items: [['dots-vertical', lambda x: app.root.ids.nav_layout.toggle_nav_drawer()]]
+            ScreenManager:
+                id: scr_mngr
+                Screen:
+                    name: 'Zones'
+                    ScrollView:
+                        do_scroll_x: False
+                        MDList:
+                            id: lst_zonelist
+                            OneLineListItem:
+                                text: "Refresh Zones"
+                                on_release: app.root.refresh_zones()
+                Screen:
+                    name: 'Modes'
+                    ScrollView:
+                        do_scroll_x: False
+                        MDList:
+                            id: lst_modelist
+                            TwoLineIconListItem:
+                                text: "Random"
+                                secondary_text: "Randomly change colors"
+                                on_release: app.root.set_mode(1)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Confetti"
+                                secondary_text: "Popping colors like confetti"
+                                on_release: app.root.set_mode(3)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Rainbow Solid"
+                                secondary_text: "Solid Rainbow"
+                                on_release: app.root.set_mode(4)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Rainbow BPM"
+                                secondary_text: "Rainbow thumping at a speed"
+                                on_release: app.root.set_mode(5)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "'Murica Chase"
+                                secondary_text: "Red,white,and blue confetti"
+                                on_release: app.root.set_mode(6)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Voobing Red"
+                                secondary_text: "Red flashing in-and-out, like RED ALERT"
+                                on_release: app.root.set_mode(10)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Voobing Green"
+                                secondary_text: "Green flashing in-and-out"
+                                on_release: app.root.set_mode(20)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Voobing Blue"
+                                secondary_text: "Blue flashing in-and-out"
+                                on_release: app.root.set_mode(30)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Voobing Orange"
+                                secondary_text: "Orange flashing in-and-out"
+                                on_release: app.root.set_mode(40)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Swipe Red/Green"
+                                secondary_text: "Red and green swipe over each other"
+                                on_release: app.root.set_mode(50)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Swipe Red/Blue"
+                                secondary_text: "Red and blue swipe over each other"
+                                on_release: app.root.set_mode(51)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Swipe Blue/Green"
+                                secondary_text: "Blue and green swipe over each other"
+                                on_release: app.root.set_mode(52)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
+                            TwoLineIconListItem:
+                                text: "Gradient"
+                                secondary_text: "Color Gradient Mode"
+                                on_release: app.root.set_mode(99)
+                                IconLeftSampleWidget:
+                                    icon: 'comment-text'
