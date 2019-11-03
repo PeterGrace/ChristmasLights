@@ -15,13 +15,22 @@ class RootWidget(FloatLayout):
                 if 'URLBase' in devices['root']:
                     self.urlbase = devices['root']['URLBase']
                     Logger.info(f"set urlbase to {self.urlbase}")
+                    self.ids.btn_refresh.text = self.urlbase
             else:
                 self.urlbase = ""
         else:
             self.urlbase= ""
 
         pass
-        
+    def reboot_unit(self):
+        url=f"{self.urlbase}reboot/please"
+        payload={}
+        try:
+            requests.post(url, json=payload, timeout=(2,2))
+            Logger.info("request sent")
+        except Exception:
+            Logger.warn("unable to set mode.")        
+
     def set_mode(self, modenum):
         url=f"{self.urlbase}lights"
         payload={}

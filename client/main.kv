@@ -6,10 +6,15 @@
             text: 'Zones'
             BoxLayout:
                 GridLayout:
+                    rows: 2
                     Button:
                         text: "Refresh"
-                        id: zone_refresh_button
+                        id: btn_refresh
                         on_press: root.refresh_zones()
+                    Button:
+                        text: "Reboot Unit"
+                        id: btn_reboot
+                        on_press: root.reboot_unit()
         
         TabbedPanelItem:
             text: 'Patterns'
@@ -36,6 +41,45 @@
                         text: "Rainbow BPM"
                         id: rainbow_bpm
                         on_press: root.set_mode(5)
+                    Button:
+                        text: "'murica Chase"
+                        id: murica_chase
+                        on_press: root.set_mode(6)
+                    Button:
+                        text: "Red Voob"
+                        id: red_voob
+                        on_press: root.set_mode(10)
+                    Button:
+                        text: "Green Voob"
+                        id: green_voob
+                        on_press: root.set_mode(20)
+                    Button:
+                        text: "Blue Voob"
+                        id: blue_voob
+                        on_press: root.set_mode(30)
+                    Button:
+                        text: "Orange Voob"
+                        id: orange_voob
+                        on_press: root.set_mode(40)
+                    Button:
+                        text: "Red/Green Swipe"
+                        id: redgreen_swipe
+                        on_press: root.set_mode(50)
+                    Button:
+                        text: "Red/Blue Swipe"
+                        id: redblue_swipe
+                        on_press: root.set_mode(51)
+                    Button:
+                        text: "Blue/Green Swipe"
+                        id: bluegreen_swipe
+                        on_press: root.set_mode(52)
+                    Button:
+                        text: "Gradient"
+                        id: gradient_mode
+                        on_press: root.set_mode(99)
+
+                    
+                
         
         TabbedPanelItem:
             text: 'Colors'
