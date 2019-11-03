@@ -30,17 +30,26 @@ class RootWidget(FloatLayout):
     
     def populate_zones(self, devices):
         if devices is not None:
-            if 'root' in devices:
-                if 'URLBase' in devices['root']:
-                    self.urlbase = devices['root']['URLBase']
-                    Logger.info(f"set urlbase to {self.urlbase}")
-                    self.ids.lst_zonelist.add_widget(TwoLineListItem(text=devices['root']['device']['friendlyName'],secondary_text=devices['root']['URLBase']))
-            else:
-                self.urlbase = ""
-        else:
-            self.urlbase= ""
+            for device in devices:
+                if 'root' in device:
+                    if 'URLBase' in device['root']:
+                        self.urlbase = device['root']['URLBase']
+                        Logger.info(f"set urlbase to {self.urlbase}")
+                        self.ids.lst_zonelist.add_widget(TwoLineListItem(text=device['root']['device']['friendlyName'],secondary_text=device['root']['URLBase']))
+                    elif 'device' in device['root']:
+                        if 'serviceList' in device['root']['device']:
+                            if 'service' in device['root']['device']['serviceList']:
+                                if 'URLBase' in device['root']['device']['serviceList']['service']:
+                                    self.ids.lst_zonelist.add_widget(
+                                        TwoLineListItem(text=device['root']['device']['friendlyName'],
+                                        secondary_text=device['root']['device']['serviceList']['service']['URLBase'],
+                                        on_release=self.set_urlbase)
+                                    )
+    
+    def set_urlbase(self, callee):
+        Logger.info(f"setting urlbase to {callee.secondary_text}")
+        self.urlbase = callee.secondary_text
 
-        pass
     def reboot_unit(self):
         url=f"{self.urlbase}reboot/please"
         payload={}
