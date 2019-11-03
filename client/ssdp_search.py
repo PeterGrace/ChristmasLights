@@ -3,13 +3,7 @@ import requests
 import xmltodict
 import json
 import re
-#msg = \
-#    'M-SEARCH * HTTP/1.1\r\n' \
-#    'HOST:239.255.255.250:1900\r\n' \
-#    'ST:upnp:rootdevice\r\n' \
-#    'MX:2\r\n' \
-#    'MAN:"ssdp:discover"\r\n' \
-#    '\r\n'
+import netifaces
 msg = \
     'M-SEARCH * HTTP/1.1\r\n' \
     'HOST:239.255.255.250:1900\r\n' \
@@ -20,7 +14,10 @@ msg = \
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
 s.settimeout(2)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-s.bind(('10.65.3.168', 65507))
+gws = netifaces.gateways()
+ifidx = gws['default'][netifaces.AF_INET][1]
+ifip = netifaces.ifaddresses(ifidx)[netifaces.AF_INET][0]['addr']
+s.bind((ifip, 65507))
 
 # Set up UDP socket
 def getSSDP():
