@@ -14,6 +14,28 @@
         TabbedPanelItem:
             text: 'Patterns'
             BoxLayout:
+                GridLayout:
+                    rows: 4
+                    Button:
+                        text: "Random"
+                        id: random_mode
+                        on_press: root.set_mode(1)
+                    Button:
+                        text: "Icicle"
+                        id: icicle_mode
+                        on_press: root.set_mode(2)
+                    Button:
+                        text: "Confetti"
+                        id: confetti_mode
+                        on_press: root.set_mode(3)
+                    Button:
+                        text: "Rainbow"
+                        id: rainbow_mode
+                        on_press: root.set_mode(4)
+                    Button:
+                        text: "Rainbow BPM"
+                        id: rainbow_bpm
+                        on_press: root.set_mode(5)
         
         TabbedPanelItem:
             text: 'Colors'

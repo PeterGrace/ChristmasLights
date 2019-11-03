@@ -667,7 +667,7 @@ void debugmsg(char *foo)
   Serial.println(logmsg);
   if (WiFi.localIP().toString() != "0.0.0.0")
   {
-    UDP.beginPacket("10.65.3.241", 1225);
+    UDP.beginPacket("10.65.0.254", 1225);
     UDP.write(logmsg);
     UDP.endPacket();
   }

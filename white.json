@@ -1,0 +1,9 @@
+{
+    "mode": 90,
+    "bpm": 60,
+    "brightness": 255,
+    "num_leds": 120,
+    "hue":128,
+    "saturation": 0,
+    "zone": "cncrouter"
+}
