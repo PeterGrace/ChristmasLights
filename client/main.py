@@ -10,6 +10,7 @@ from kivymd.button import MDIconButton
 from kivymd.date_picker import MDDatePicker
 from kivymd.dialog import MDDialog
 from kivymd.label import MDLabel
+from kivy.clock import Clock
 from kivymd.list import ILeftBody, ILeftBodyTouch, IRightBodyTouch, BaseListItem, OneLineListItem,TwoLineListItem
 from kivymd.material_resources import DEVICE_TYPE
 from kivymd.navigationdrawer import MDNavigationDrawer, NavigationDrawerHeaderBase
@@ -24,10 +25,15 @@ engine = KivyEngine()
 
 class RootWidget(FloatLayout):
     def refresh_zones(self, caller=None):
+        self.ids.scr_mngr.current = 'Loading'
+        self.canvas.ask_update()
         self.ids.lst_zonelist.clear_widgets()
         self.ids.lst_zonelist.add_widget(OneLineListItem(text="Refresh Zones", on_release=self.refresh_zones))
-        getSSDP(self.populate_zones)
+        Clock.schedule_once(self.trigger_ssdp_fetch,1)
     
+    def trigger_ssdp_fetch(self,dt):
+        getSSDP(self.populate_zones)
+
     def populate_zones(self, devices):
         if devices is not None:
             for device in devices:
@@ -35,7 +41,7 @@ class RootWidget(FloatLayout):
                     if 'URLBase' in device['root']:
                         self.urlbase = device['root']['URLBase']
                         Logger.info(f"set urlbase to {self.urlbase}")
-                        self.ids.lst_zonelist.add_widget(TwoLineListItem(text=device['root']['device']['friendlyName'],secondary_text=device['root']['URLBase']))
+                        self.ids.lst_zonelist.add_widget(TwoLineListItem(text=device['root']['device']['friendlyName'],secondary_text=device['root']['URLBase'],on_release=self.set_urlbase))
                     elif 'device' in device['root']:
                         if 'serviceList' in device['root']['device']:
                             if 'service' in device['root']['device']['serviceList']:
@@ -45,10 +51,19 @@ class RootWidget(FloatLayout):
                                         secondary_text=device['root']['device']['serviceList']['service']['URLBase'],
                                         on_release=self.set_urlbase)
                                     )
+        self.ids.scr_mngr.current = 'Zones'
+
     
     def set_urlbase(self, callee):
-        Logger.info(f"setting urlbase to {callee.secondary_text}")
-        self.urlbase = callee.secondary_text
+        if callee.secondary_text[-1] != '/':
+            self.urlbase = callee.secondary_text
+            self.urlbase += "/"
+        else:
+            self.urlbase = callee.secondary_text
+        Logger.info(f"URLBase = {self.urlbase}")
+        Snackbar(text=f"Now addressing {callee.text}").show()
+        self.ids.toolbar.title=f"{callee.text} - CLUI"
+
 
     def reboot_unit(self):
         url=f"{self.urlbase}reboot/please"

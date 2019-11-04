@@ -1,6 +1,7 @@
 #:import Toolbar kivymd.toolbar.Toolbar
 #:import ThemeManager kivymd.theming.ThemeManager
 #:import MDNavigationDrawer kivymd.navigationdrawer.MDNavigationDrawer
+#:import MDSpinner kivymd.spinner.MDSpinner
 #:import NavigationLayout kivymd.navigationdrawer.NavigationLayout
 #:import NavigationDrawerDivider kivymd.navigationdrawer.NavigationDrawerDivider
 #:import NavigationDrawerToolbar kivymd.navigationdrawer.NavigationDrawerToolbar
@@ -133,3 +134,12 @@
                                 on_release: app.root.set_mode(99)
                                 IconLeftSampleWidget:
                                     icon: 'comment-text'
+                Screen:
+                    name: 'Loading'
+                    MDSpinner:
+                        id: refresh_spinner
+                        size_hint: None, None
+                        size: dp(46), dp(46)
+                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        active: True
+
