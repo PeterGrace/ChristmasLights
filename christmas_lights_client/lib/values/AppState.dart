@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:upnp/upnp.dart';
 
-class AppState extends ChangeNotifier {
+class AppState with ChangeNotifier {
   DeviceDiscoverer discoverer = new DeviceDiscoverer();
   List<Device> _devices = <Device>[];
   String _url = "";
